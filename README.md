@@ -4,7 +4,7 @@ An interactive CLI tool that turns still images into animated GIFs, built in pur
 
 ## Features
 
-### 15 Effects
+### 21 Effects
 | Key | Effect |
 |-----|--------|
 | `none` | Static (no effect) |
@@ -22,6 +22,12 @@ An interactive CLI tool that turns still images into animated GIFs, built in pur
 | `zoompulse` | Rhythmic zoom pulse |
 | `tvstatic` | TV noise / static bars |
 | `ripple` | Liquid ripple warp (requires scipy) |
+| `rotate3d` | 2-D→3-D Y-axis rotation with back-face flip |
+| `orbit` | Camera orbiting the subject (circular pan + zoom) |
+| `tiltshift` | Tilt-shift miniature (animated sharp centre band) |
+| `kaleidoscope` | 4-fold mirror kaleidoscope, rotates each frame |
+| `shatter` | Grid tiles explode outward then reform |
+| `filmburn` | Retro warm sweeping light flare with grain |
 
 ### 17 Overlays (stack as many as you like)
 ✨ Sparkles · ⭐ Twinkling Stars · 🔥 Fire Particles · ❄ Snow · 🎊 Confetti  

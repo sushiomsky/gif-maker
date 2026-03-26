@@ -13,6 +13,7 @@ Usage:
 
 Effects:  none glitch neon kenburns matrix hud holographic fire pixelsort
           lightning vignette colorgrade zoompulse tvstatic ripple
+          rotate3d orbit tiltshift kaleidoscope shatter filmburn
 
 Overlays: sparkles stars fire_particles snow confetti lightning coins hearts
           fireworks rain bubbles smoke arrows crosshair emoji_party neon_border
@@ -376,23 +377,188 @@ def efx_ripple(img, n):
         frames.append(Image.fromarray(np.clip(arr,0,255).astype(np.uint8),"RGBA"))
     return frames
 
+def efx_rotate3d(img, n):
+    """Simulate a 3-D Y-axis rotation: width squish with back-face flip."""
+    base = img.convert("RGBA")
+    W, H = base.size
+    back = base.transpose(Image.FLIP_LEFT_RIGHT)
+    frames = []
+    for i in range(n):
+        t = i / n
+        cos_a = math.cos(t * 2 * math.pi)
+        src = base if cos_a >= 0 else back
+        new_w = max(1, int(W * abs(cos_a)))
+        if new_w < 2:
+            frame = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        else:
+            squeezed = src.resize((new_w, H), Image.LANCZOS)
+            frame = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+            frame.paste(squeezed, ((W - new_w) // 2, 0), squeezed)
+            if cos_a < 0:
+                arr = np.array(frame, dtype=np.float32)
+                arr[:, :, :3] *= 0.55 + 0.45 * abs(cos_a)
+                frame = Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+        frames.append(frame)
+    return frames
+
+def efx_orbit(img, n):
+    """Simulate a camera orbiting the subject: circular pan + gentle zoom."""
+    base = img.convert("RGBA")
+    W, H = base.size
+    PAD_X = max(8, int(W * 0.18))
+    PAD_Y = max(4, int(H * 0.10))
+    padded = Image.new("RGBA", (W + 2 * PAD_X, H + 2 * PAD_Y), (0, 0, 0, 0))
+    padded.paste(base, (PAD_X, PAD_Y))
+    PW, PH = padded.size
+    frames = []
+    for i in range(n):
+        t = i / n
+        angle = t * 2 * math.pi
+        dx = int(math.sin(angle) * PAD_X * 0.85)
+        dy = int(math.sin(angle * 0.5 + math.pi * 0.25) * PAD_Y * 0.7)
+        zoom = 1.0 + 0.07 * math.cos(angle)
+        crop_w = max(4, int(W / zoom))
+        crop_h = max(4, int(H / zoom))
+        left = max(0, min(PW // 2 + dx - crop_w // 2, PW - crop_w))
+        top  = max(0, min(PH // 2 + dy - crop_h // 2, PH - crop_h))
+        frames.append(padded.crop((left, top, left + crop_w, top + crop_h)).resize((W, H), Image.LANCZOS))
+    return frames
+
+def efx_tiltshift(img, n):
+    """Tilt-shift miniature: animated sharp centre band with blurred extremities."""
+    from PIL import ImageFilter
+    base_rgba = img.convert("RGBA")
+    base = base_rgba.convert("RGB")
+    W, H = base.size
+    blur_r = max(2, min(W, H) // 20)
+    blurred  = base.filter(ImageFilter.GaussianBlur(radius=blur_r))
+    blurred2 = blurred.filter(ImageFilter.GaussianBlur(radius=blur_r))
+    alpha_ch = base_rgba.split()[3]
+    ones = np.ones((1, W), dtype=np.float32)
+    frames = []
+    for i in range(n):
+        t = i / n
+        focus_y = 0.5 + 0.07 * math.sin(t * 2 * math.pi)
+        dist = np.maximum(0.0, np.abs(np.arange(H, dtype=np.float32) / H - focus_y) - 0.18)
+        weight = np.clip(dist / 0.25, 0.0, 1.0)
+        m1 = Image.fromarray((np.clip(weight * 2, 0.0, 1.0)[:, np.newaxis] * ones * 255).astype(np.uint8), "L")
+        m2 = Image.fromarray((np.clip(weight * 2 - 1.0, 0.0, 1.0)[:, np.newaxis] * ones * 255).astype(np.uint8), "L")
+        frame = Image.composite(blurred, base, m1)
+        frame = Image.composite(blurred2, frame, m2)
+        frame = ImageEnhance.Color(frame).enhance(1.5)
+        r, g, b = frame.split()
+        frames.append(Image.merge("RGBA", (r, g, b, alpha_ch)))
+    return frames
+
+def efx_kaleidoscope(img, n):
+    """Kaleidoscope: 4-fold mirror tile rotated smoothly each frame."""
+    base = img.convert("RGBA")
+    W, H = base.size
+    side = min(W, H)
+    sq = base.crop(((W - side) // 2, (H - side) // 2,
+                    (W + side) // 2, (H + side) // 2)).resize((side, side), Image.LANCZOS)
+    frames = []
+    for i in range(n):
+        t = i / n
+        rotated = sq.rotate(t * 45, resample=Image.BICUBIC, expand=False)
+        half = side // 2
+        q    = rotated.crop((0, 0, half, half))
+        q_lr = q.transpose(Image.FLIP_LEFT_RIGHT)
+        q_tb = q.transpose(Image.FLIP_TOP_BOTTOM)
+        q_bt = q_lr.transpose(Image.FLIP_TOP_BOTTOM)
+        tile = Image.new("RGBA", (side, side))
+        tile.paste(q,    (0,    0))
+        tile.paste(q_lr, (half, 0))
+        tile.paste(q_tb, (0,    half))
+        tile.paste(q_bt, (half, half))
+        frame = tile.resize((W, H), Image.LANCZOS) if (W != side or H != side) else tile
+        frames.append(frame)
+    return frames
+
+def efx_shatter(img, n):
+    """Shatter: grid tiles explode outward then reform."""
+    base = img.convert("RGBA")
+    W, H = base.size
+    rng = random.Random(77)
+    COLS, ROWS = 8, 6
+    TW, TH = max(1, W // COLS), max(1, H // ROWS)
+    dirs = [(rng.uniform(-1, 1), rng.uniform(-1, 1)) for _ in range(COLS * ROWS)]
+    max_disp = max(W, H) * 0.35
+    frames = []
+    for i in range(n):
+        t = i / n
+        ease = math.sin(t / 0.5 * math.pi / 2) if t < 0.5 else 1 - math.sin((t - 0.5) / 0.5 * math.pi / 2)
+        frame = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        for row in range(ROWS):
+            for col in range(COLS):
+                idx = row * COLS + col
+                sx, sy = col * TW, row * TH
+                tile = base.crop((sx, sy, min(sx + TW, W), min(sy + TH, H)))
+                ox = int(dirs[idx][0] * max_disp * ease)
+                oy = int(dirs[idx][1] * max_disp * ease)
+                tile = tile.rotate(dirs[idx][0] * 30 * ease, expand=False, resample=Image.BICUBIC)
+                frame.paste(tile, (sx + ox, sy + oy), tile)
+        frames.append(frame)
+    return frames
+
+def efx_filmburn(img, n):
+    """Retro film burn: warm sweeping light flare with grain and aged tone."""
+    base = img.convert("RGBA")
+    W, H = base.size
+    arr = np.array(base, dtype=np.float32)
+    arr[:, :, 0] = np.clip(arr[:, :, 0] * 1.08 + 12, 0, 255)
+    arr[:, :, 2] = np.clip(arr[:, :, 2] * 0.82, 0, 255)
+    aged = Image.fromarray(arr.astype(np.uint8), "RGBA")
+    rng = random.Random(33)
+    frames = []
+    for i in range(n):
+        t = i / n
+        frame = aged.copy()
+        overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        od = ImageDraw.Draw(overlay)
+        burn_cx = int((t * 1.4 - 0.2) * W)
+        burn_hw = max(2, int(W * 0.12))
+        for x in range(max(0, burn_cx - burn_hw), min(W, burn_cx + burn_hw)):
+            dist = abs(x - burn_cx) / burn_hw
+            alpha = int(190 * (1 - dist * dist))
+            if alpha > 0:
+                od.line([(x, 0), (x, H)], fill=(255, 215, 110, alpha))
+        for _ in range(3):
+            hx = rng.randint(0, W - 1)
+            hy = rng.randint(0, H - 1)
+            r = rng.randint(2, max(3, W // 30))
+            od.ellipse([hx - r, hy - r, hx + r, hy + r],
+                       fill=(255, 240, 180, rng.randint(100, 220)))
+        frame = Image.alpha_composite(frame, overlay)
+        grain = np.random.RandomState(i * 31).normal(0, 7, (H, W, 3)).astype(np.float32)
+        fa = np.array(frame, dtype=np.float32)
+        fa[:, :, :3] = np.clip(fa[:, :, :3] + grain, 0, 255)
+        frames.append(Image.fromarray(fa.astype(np.uint8), "RGBA"))
+    return frames
+
 # Registry
 EFFECTS: dict[str, tuple[str, callable]] = {
-    "none":        ("No effect (static frames)",  efx_none),
-    "glitch":      ("Glitch Scan",                efx_glitch),
-    "neon":        ("Neon Hue Cycle",             efx_neon),
-    "kenburns":    ("Ken Burns Zoom + Pan",       efx_kenburns),
-    "matrix":      ("Matrix Code Rain",           efx_matrix),
-    "hud":         ("HUD Scanlines + Brackets",   efx_hud),
-    "holographic": ("Holographic Foil Shimmer",   efx_holographic),
-    "fire":        ("Fire Glow + Embers",         efx_fire),
-    "pixelsort":   ("Pixel Sort Sweep",           efx_pixelsort),
-    "lightning":   ("Lightning Strike",           efx_lightning),
-    "vignette":    ("Vignette + Twinkling Stars", efx_vignette),
-    "colorgrade":  ("Cinematic Color Grade",      efx_colorgrade),
-    "zoompulse":   ("Zoom Pulse",                 efx_zoompulse),
-    "tvstatic":    ("TV Static / Noise",          efx_tvstatic),
-    "ripple":      ("Liquid Ripple Warp",         efx_ripple),
+    "none":        ("No effect (static frames)",           efx_none),
+    "glitch":      ("Glitch Scan",                         efx_glitch),
+    "neon":        ("Neon Hue Cycle",                      efx_neon),
+    "kenburns":    ("Ken Burns Zoom + Pan",                efx_kenburns),
+    "matrix":      ("Matrix Code Rain",                    efx_matrix),
+    "hud":         ("HUD Scanlines + Brackets",            efx_hud),
+    "holographic": ("Holographic Foil Shimmer",            efx_holographic),
+    "fire":        ("Fire Glow + Embers",                  efx_fire),
+    "pixelsort":   ("Pixel Sort Sweep",                    efx_pixelsort),
+    "lightning":   ("Lightning Strike",                    efx_lightning),
+    "vignette":    ("Vignette + Twinkling Stars",          efx_vignette),
+    "colorgrade":  ("Cinematic Color Grade",               efx_colorgrade),
+    "zoompulse":   ("Zoom Pulse",                          efx_zoompulse),
+    "tvstatic":    ("TV Static / Noise",                   efx_tvstatic),
+    "ripple":      ("Liquid Ripple Warp",                  efx_ripple),
+    "rotate3d":    ("3-D Y-Axis Rotation",                 efx_rotate3d),
+    "orbit":       ("Camera Orbit (circular pan + zoom)",  efx_orbit),
+    "tiltshift":   ("Tilt-Shift Miniature",                efx_tiltshift),
+    "kaleidoscope": ("Kaleidoscope Mirror Tiles",           efx_kaleidoscope),
+    "shatter":     ("Shatter & Reform",                    efx_shatter),
+    "filmburn":    ("Retro Film Burn",                     efx_filmburn),
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
