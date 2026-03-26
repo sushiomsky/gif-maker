@@ -18,6 +18,9 @@ Effects:  none glitch neon kenburns matrix hud holographic fire pixelsort
 Overlays: sparkles stars fire_particles snow confetti lightning coins hearts
           fireworks rain bubbles smoke arrows crosshair emoji_party neon_border
 
+Stickers: star heart fire crown rainbow bolt 100 disco
+          (or use a file path to a transparent .gif / .png)
+
 Text styles: typewriter neon_glow glitch_text bounce scroll fade
 """
 
@@ -30,7 +33,9 @@ VERSION = "1.0"
 # ── paths & library ───────────────────────────────────────────────────────────
 LIBRARY_DIR  = os.path.expanduser("~/.gif-maker/library")
 PRESETS_FILE = os.path.expanduser("~/.gif-maker/presets.json")
+STICKER_DIR  = os.path.expanduser("~/.gif-maker/stickers")
 os.makedirs(LIBRARY_DIR, exist_ok=True)
+os.makedirs(STICKER_DIR, exist_ok=True)
 
 # ── ANSI colours ──────────────────────────────────────────────────────────────
 RST = "\033[0m";  BLD = "\033[1m";  DIM = "\033[2m"
@@ -825,6 +830,232 @@ OVERLAYS: dict[str, tuple[str, callable]] = {
 }
 
 # ══════════════════════════════════════════════════════════════════════════════
+#  STICKERS  — each fn(n_frames, size) -> list[RGBA Image] on transparent bg
+# ══════════════════════════════════════════════════════════════════════════════
+
+def stk_star(n: int, size: int = 80) -> list:
+    """Animated 5-pointed star with rotating shine."""
+    frames = []
+    for i in range(n):
+        t = i / n
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        cx, cy = size / 2, size / 2
+        r_outer, r_inner = size * 0.42, size * 0.18
+        pts = []
+        for k in range(10):
+            ang = math.pi / 2 + k * math.pi / 5 + t * math.pi * 2
+            r = r_outer if k % 2 == 0 else r_inner
+            pts.append((cx + r * math.cos(ang), cy - r * math.sin(ang)))
+        glow = int(200 + 55 * math.sin(t * math.pi * 4))
+        draw.polygon(pts, fill=(255, 220, 0, glow))
+        shine_a = int(180 * abs(math.sin(t * math.pi * 2)))
+        draw.ellipse([cx - size * 0.08, cy - size * 0.35,
+                      cx + size * 0.08, cy - size * 0.18],
+                     fill=(255, 255, 255, shine_a))
+        frames.append(img)
+    return frames
+
+
+def stk_heart(n: int, size: int = 80) -> list:
+    """Pulsing heart sticker."""
+    frames = []
+    for i in range(n):
+        t = i / n
+        scale_f = 0.9 + 0.15 * abs(math.sin(t * math.pi * 2))
+        s = max(8, int(size * scale_f))
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        tmp = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+        d = ImageDraw.Draw(tmp)
+        cx, cy = s / 2, s / 2
+        r = s / 4
+        d.ellipse([cx - r - r / 2, cy - r, cx - r / 2 + r / 4, cy + r],
+                  fill=(255, 50, 100, 220))
+        d.ellipse([cx - r / 4, cy - r, cx + r + r / 4, cy + r],
+                  fill=(255, 50, 100, 220))
+        pts = [(cx - r - r / 2 + 2, cy), (cx + r + r / 4 - 2, cy),
+               (cx, cy + r + r / 2)]
+        d.polygon(pts, fill=(255, 50, 100, 220))
+        offset = ((size - s) // 2, (size - s) // 2)
+        img.paste(tmp, offset, tmp)
+        frames.append(img)
+    return frames
+
+
+def stk_fire(n: int, size: int = 80) -> list:
+    """Animated fire sticker."""
+    frames = []
+    for i in range(n):
+        t = i / n
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        cx = size / 2
+        flicker = math.sin(t * math.pi * 6)
+        h = size * (0.7 + 0.1 * flicker)
+        w = size * 0.55
+        pts_out = [
+            (cx - w / 2, size),
+            (cx - w / 3, size / 2 + h / 6 + 5 * math.sin(t * math.pi * 4)),
+            (cx, size - h),
+            (cx + w / 4, size / 2 + h / 4 + 4 * math.cos(t * math.pi * 3)),
+            (cx + w / 2, size),
+        ]
+        draw.polygon(pts_out, fill=(255, 80, 0, 200))
+        pts_in = [
+            (cx - w / 4, size),
+            (cx - w / 8, size / 2 + h / 4),
+            (cx, size - h + h / 4),
+            (cx + w / 8, size / 2 + h / 3),
+            (cx + w / 4, size),
+        ]
+        draw.polygon(pts_in, fill=(255, 200, 0, 230))
+        frames.append(img)
+    return frames
+
+
+def stk_crown(n: int, size: int = 80) -> list:
+    """Animated crown with pulsing gems."""
+    frames = []
+    for i in range(n):
+        t = i / n
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        cx, cy = size / 2, size * 0.55
+        w, h = size * 0.8, size * 0.38
+        x0, y1 = cx - w / 2, cy + h / 2
+        peak_pts = [
+            (x0, cy),
+            (x0, cy - h * 0.5),
+            (cx - w * 0.2, cy + h * 0.1),
+            (cx, cy - h * 0.85),
+            (cx + w * 0.2, cy + h * 0.1),
+            (cx + w / 2, cy - h * 0.5),
+            (cx + w / 2, cy),
+        ]
+        draw.polygon(peak_pts, fill=(255, 200, 0, 230))
+        draw.rectangle([x0, cy, cx + w / 2, y1], fill=(255, 200, 0, 230))
+        gem_glow = int(200 + 55 * math.sin(t * math.pi * 4))
+        gem_y = int((cy + y1) / 2)
+        for gx in [int(x0 + w * 0.2), int(cx), int(x0 + w * 0.8)]:
+            draw.ellipse([gx - 4, gem_y - 4, gx + 4, gem_y + 4],
+                         fill=(255, 100, 180, gem_glow))
+        frames.append(img)
+    return frames
+
+
+def stk_rainbow(n: int, size: int = 80) -> list:
+    """Animated rainbow arc sticker."""
+    frames = []
+    for i in range(n):
+        t = i / n
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        cx, cy = size / 2, size * 0.7
+        glow = int(200 + 55 * math.sin(t * math.pi * 2))
+        colors = [(255, 0, 0), (255, 127, 0), (255, 255, 0),
+                  (0, 200, 0), (0, 100, 255), (150, 0, 255)]
+        arc_w = max(1, int(size * 0.05))
+        for j, col in enumerate(reversed(colors)):
+            r = int(size * (0.45 - j * 0.05))
+            if r > 0:
+                draw.arc([cx - r, cy - r, cx + r, cy + r],
+                         start=180, end=360, fill=col + (glow,), width=arc_w)
+        frames.append(img)
+    return frames
+
+
+def stk_bolt(n: int, size: int = 80) -> list:
+    """Animated lightning bolt sticker."""
+    frames = []
+    for i in range(n):
+        t = i / n
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        glow = int(200 + 55 * abs(math.sin(t * math.pi * 4)))
+        cx = size / 2
+        pts = [
+            (cx + size * 0.12, size * 0.05),
+            (cx - size * 0.08, size * 0.48),
+            (cx + size * 0.06, size * 0.48),
+            (cx - size * 0.12, size * 0.95),
+            (cx + size * 0.20, size * 0.42),
+            (cx + size * 0.00, size * 0.42),
+        ]
+        draw.polygon([(int(x), int(y)) for x, y in pts],
+                     fill=(255, 230, 0, glow))
+        frames.append(img)
+    return frames
+
+
+def stk_hundredpoints(n: int, size: int = 80) -> list:
+    """Animated 100-points sticker."""
+    fnt_big   = get_font(max(8, int(size * 0.35)))
+    fnt_small = get_font(max(8, int(size * 0.22)))
+    frames = []
+    for i in range(n):
+        t = i / n
+        s = max(8, int(size * (0.9 + 0.12 * abs(math.sin(t * math.pi * 2)))))
+        inner = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+        d = ImageDraw.Draw(inner)
+        glow = int(200 + 55 * math.sin(t * math.pi * 4))
+        d.text((int(s * 0.05), int(s * 0.08)), "100",
+               fill=(255, 50, 50, glow), font=fnt_big)
+        d.text((int(s * 0.15), int(s * 0.55)), "POINTS",
+               fill=(255, 80, 80, glow), font=fnt_small)
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        ox, oy = (size - s) // 2, (size - s) // 2
+        img.paste(inner, (ox, oy), inner)
+        frames.append(img)
+    return frames
+
+
+def stk_disco(n: int, size: int = 80) -> list:
+    """Animated disco ball sticker."""
+    rng2 = random.Random(99)
+    cols_tile = [(255, 0, 0), (0, 255, 0), (0, 100, 255),
+                 (255, 255, 0), (255, 0, 255), (0, 255, 255)]
+    frames = []
+    for i in range(n):
+        t = i / n
+        img = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        cx, cy = size // 2, size // 2
+        r = size // 2 - 4
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r],
+                     fill=(180, 180, 200, 220))
+        tile_sz = max(3, size // 10)
+        for row in range(-r, r, tile_sz):
+            for col_off in range(-r, r, tile_sz):
+                rot = t * math.pi * 4 + row * 0.1
+                tx = cx + int(col_off * math.cos(rot) - row * math.sin(rot))
+                ty = cy + int(col_off * math.sin(rot) + row * math.cos(rot))
+                if (tx - cx) ** 2 + (ty - cy) ** 2 < r ** 2:
+                    col2 = rng2.choice(cols_tile)
+                    a = int(150 + 100 * abs(math.sin(t * math.pi * 2 + row)))
+                    draw.rectangle([tx, ty, tx + tile_sz - 1, ty + tile_sz - 1],
+                                   fill=col2 + (a,))
+        frames.append(img)
+    return frames
+
+
+# Registry
+STICKERS: dict[str, tuple[str, callable]] = {
+    "star":    ("⭐  Star",           stk_star),
+    "heart":   ("❤   Heart",          stk_heart),
+    "fire":    ("🔥  Fire",           stk_fire),
+    "crown":   ("👑  Crown",          stk_crown),
+    "rainbow": ("🌈  Rainbow",        stk_rainbow),
+    "bolt":    ("⚡  Lightning Bolt", stk_bolt),
+    "100":     ("💯  100 Points",     stk_hundredpoints),
+    "disco":   ("🪩  Disco Ball",     stk_disco),
+}
+
+STICKER_POSITIONS = [
+    "center", "top-left", "top-right",
+    "bottom-left", "bottom-right", "top-center", "bottom-center",
+]
+
+# ══════════════════════════════════════════════════════════════════════════════
 #  TEXT ANIMATIONS
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -884,8 +1115,96 @@ def apply_text(frames, text: str, style="neon_glow",
             draw.text((bx, by), text, fill=color+(a,), font=fnt)
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  GENERATION ENGINE
+#  STICKER ENGINE
 # ══════════════════════════════════════════════════════════════════════════════
+
+def _load_sticker_frames_from_file(path: str, n: int) -> list:
+    """Load frames from a transparent GIF/PNG sticker file, cycling to n frames."""
+    src = Image.open(path)
+    raw = []
+    try:
+        for fno in range(getattr(src, "n_frames", 1)):
+            src.seek(fno)
+            raw.append(src.convert("RGBA").copy())
+    except EOFError:
+        pass
+    if not raw:
+        raw = [src.convert("RGBA")]
+    return [raw[i % len(raw)] for i in range(n)]
+
+
+def _sticker_paste_offset(canvas_w: int, canvas_h: int,
+                           stk_w: int, stk_h: int, position: str) -> tuple:
+    """Return (x, y) top-left corner for pasting a sticker onto a canvas."""
+    pad = 8
+    pos_map = {
+        "center":        ((canvas_w - stk_w) // 2, (canvas_h - stk_h) // 2),
+        "top-left":      (pad, pad),
+        "top-right":     (canvas_w - stk_w - pad, pad),
+        "bottom-left":   (pad, canvas_h - stk_h - pad),
+        "bottom-right":  (canvas_w - stk_w - pad, canvas_h - stk_h - pad),
+        "top-center":    ((canvas_w - stk_w) // 2, pad),
+        "bottom-center": ((canvas_w - stk_w) // 2, canvas_h - stk_h - pad),
+    }
+    return pos_map.get(position, pos_map["center"])
+
+
+def apply_sticker(frames: list, key_or_path: str,
+                  position: str = "center", scale: float = 0.3):
+    """Composite a sticker onto every frame.
+
+    *key_or_path* may be a key from the STICKERS registry, an absolute/relative
+    file path, or a filename inside STICKER_DIR.  The sticker is scaled so its
+    longer side equals ``scale`` × the shorter canvas dimension.
+    """
+    if not frames:
+        return
+    W, H = frames[0].size
+    stk_size = max(16, int(min(W, H) * scale))
+    n = len(frames)
+
+    # Resolve key / path
+    if key_or_path in STICKERS:
+        stk_frames = STICKERS[key_or_path][1](n, stk_size)
+    else:
+        # Try absolute/relative path, then STICKER_DIR/<name>
+        resolved = key_or_path
+        if not os.path.isfile(resolved):
+            for ext in ("", ".gif", ".png"):
+                candidate = os.path.join(STICKER_DIR, key_or_path + ext)
+                if os.path.isfile(candidate):
+                    resolved = candidate
+                    break
+        if not os.path.isfile(resolved):
+            print(f"  {c('✗ Sticker not found: ' + key_or_path, RED)}")
+            return
+        stk_frames = _load_sticker_frames_from_file(resolved, n)
+        stk_frames = [f.resize((stk_size, stk_size), Image.LANCZOS)
+                      for f in stk_frames]
+
+    sw, sh = stk_frames[0].size
+    px, py = _sticker_paste_offset(W, H, sw, sh, position)
+
+    for i, frame in enumerate(frames):
+        stk = stk_frames[i % len(stk_frames)]
+        frame.paste(stk, (px, py), stk)
+
+
+def list_stickers():
+    """Print built-in stickers and any user stickers found in STICKER_DIR."""
+    print(f"\n{BLD}─── BUILT-IN STICKERS ({'─'*(BOX_W-22)}){RST}")
+    for k, (label, _) in STICKERS.items():
+        print(f"  {c(k, YEL):<18} {label}")
+    user_files = sorted(
+        f for f in os.listdir(STICKER_DIR)
+        if f.lower().endswith((".gif", ".png", ".apng"))
+    ) if os.path.isdir(STICKER_DIR) else []
+    if user_files:
+        print(f"\n{BLD}─── USER STICKERS  ({STICKER_DIR}) {'─'*max(0,BOX_W-len(STICKER_DIR)-22)}{RST}")
+        for fn in user_files:
+            print(f"  {c(fn, YEL):<28} {c(os.path.join(STICKER_DIR, fn), DIM)}")
+    else:
+        print(f"\n  {c(f'Drop transparent .gif/.png files into {STICKER_DIR} to add custom stickers.', DIM)}")
 
 def generate(cfg: dict) -> tuple[str, int]:
     src = cfg["source_path"]
@@ -913,6 +1232,15 @@ def generate(cfg: dict) -> tuple[str, int]:
             size=cfg.get("text_size", 22),
             position=cfg.get("text_position", "bottom"),
         )
+
+    for stk_cfg in cfg.get("stickers", []):
+        key = stk_cfg.get("key", "")
+        if not key:
+            continue
+        pos   = stk_cfg.get("position", "center")
+        scale = stk_cfg.get("scale", 0.3)
+        print(f"  Applying sticker: {c(key, YEL)}  [{pos}  {scale:.0%}]...")
+        apply_sticker(frames, key, position=pos, scale=scale)
 
     out = cfg.get("output_path") or _auto_output(cfg)
     print(f"  Optimizing → {c(out, GRN)} ...")
@@ -982,11 +1310,14 @@ def show_status(cfg: dict):
     efx_label  = c(cfg.get("effect","none") or "none", CYN)
     ovl_label  = c(", ".join(cfg.get("overlays",[])) or "–", CYN)
     txt_label  = c(f"'{cfg['text']}' [{cfg.get('text_style','neon_glow')}]", CYN) if cfg.get("text") else c("–", DIM)
+    stk_parts  = [f"{s['key']}@{s.get('position','center')}" for s in cfg.get("stickers",[])]
+    stk_label  = c(", ".join(stk_parts) or "–", CYN)
     out_label  = c(os.path.basename(cfg.get("output_path","(auto)")), GRN)
     print(hr())
     print(f"  {c('Source',BLD)}   {src_label}  {c(f'({W_}×{H_})', DIM)}")
     print(f"  {c('Effect',BLD)}   {efx_label}")
     print(f"  {c('Overlays',BLD)} {ovl_label}")
+    print(f"  {c('Stickers',BLD)} {stk_label}")
     print(f"  {c('Text',BLD)}     {txt_label}")
     print(f"  {c('Settings',BLD)} {cfg.get('max_side',480)}px · "
           f"{cfg.get('n_frames',20)} frames · "
@@ -1012,16 +1343,19 @@ def show_overlays_menu(active: list):
 def show_main_menu(cfg: dict):
     clr(); banner(); show_status(cfg)
     print(f"\n  {BLD}MAIN MENU{RST}")
+    stk_count = len(cfg.get("stickers", []))
+    stk_label = f"Add / remove stickers  {c(f'({stk_count} active)', DIM)}"
     items = [
         ("1", "Set source image"),
         ("2", "Choose effect"),
         ("3", "Add / remove overlays"),
+        ("S", stk_label),
         ("4", "Set animated text"),
         ("5", "Settings  (size · frames · speed)"),
         ("6", "Set output filename"),
         ("7", "Save as preset"),
         ("8", "Load preset"),
-        ("L", "List all effects & overlays"),
+        ("L", "List all effects, overlays & stickers"),
         ("G", c("Generate GIF!", GRN+BLD)),
         ("Q", "Quit"),
     ]
@@ -1046,7 +1380,7 @@ def pause():
 _PRESET_ALLOWED_KEYS = {
     "effect", "overlays", "text", "text_style", "text_color",
     "text_size", "text_position", "max_side", "n_frames", "duration",
-    "output_path",
+    "output_path", "stickers",
 }
 
 def _prompt_int(msg: str, default: int, min_val: int = 1, max_val: int = 10_000) -> int:
@@ -1171,7 +1505,69 @@ def handle_list(cfg: dict):
     clr(); banner()
     show_effects_menu()
     show_overlays_menu(cfg.get("overlays",[]))
+    list_stickers()
     pause()
+
+
+def handle_stickers(cfg: dict):
+    """Interactive sticker manager — add/remove stickers with position & scale."""
+    stickers = cfg.setdefault("stickers", [])
+    while True:
+        clr(); banner()
+        print(f"\n{BLD}─── ACTIVE STICKERS ({'─'*(BOX_W-22)}){RST}")
+        if stickers:
+            for idx, s in enumerate(stickers):
+                print(f"  {c(idx, YEL)}  {s['key']:<20}  "
+                      f"pos:{s.get('position','center')}  "
+                      f"scale:{s.get('scale',0.3):.0%}")
+        else:
+            print(f"  {c('(none)', DIM)}")
+        list_stickers()
+        print(f"\n  {c('A',YEL)} Add sticker  "
+              f"|  {c('R',YEL)} Remove by index  "
+              f"|  {c('D',YEL)} Clear all  "
+              f"|  {c('Enter',YEL)} back")
+        ch = prompt("").upper()
+        if ch == "":
+            break
+        elif ch == "A":
+            key = prompt("Sticker key or file path")
+            if not key:
+                continue
+            # Resolve file if not a built-in key
+            if key not in STICKERS:
+                candidate = os.path.join(STICKER_DIR, key)
+                for ext in ("", ".gif", ".png"):
+                    if os.path.isfile(candidate + ext):
+                        key = candidate + ext
+                        break
+                else:
+                    if not os.path.isfile(key):
+                        print(f"  {c('Not found. Use a key from the list or a valid file path.', RED)}")
+                        pause()
+                        continue
+            pos = prompt("Position", default="center")
+            if pos not in STICKER_POSITIONS:
+                pos = "center"
+            raw_scale = prompt("Scale (0.05–1.0)", default="0.3")
+            try:
+                scale = max(0.05, min(1.0, float(raw_scale)))
+            except ValueError:
+                scale = 0.3
+            stickers.append({"key": key, "position": pos, "scale": scale})
+            print(f"  {c('✓', GRN)} Sticker '{key}' added.")
+            pause()
+        elif ch == "R":
+            idx_s = prompt("Index to remove")
+            try:
+                removed = stickers.pop(int(idx_s))
+                print(f"  {c('✓', GRN)} Removed '{removed['key']}'.")
+            except (ValueError, IndexError):
+                print(f"  {c('Invalid index.', RED)}")
+            pause()
+        elif ch == "D":
+            stickers.clear()
+            cfg["stickers"] = stickers
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  MAIN
@@ -1183,7 +1579,7 @@ def default_cfg() -> dict:
         "text": None, "text_style": "neon_glow", "text_color": (255,255,100),
         "text_size": 22, "text_position": "bottom",
         "max_side": 480, "n_frames": 20, "duration": 80,
-        "output_path": None,
+        "output_path": None, "stickers": [],
     }
 
 def main():
@@ -1207,6 +1603,17 @@ def main():
     ap.add_argument("--list-effects",  action="store_true")
     ap.add_argument("--list-overlays", action="store_true")
     ap.add_argument("--list-presets",  action="store_true")
+    ap.add_argument("--sticker", action="append", dest="sticker_keys", default=[],
+                    metavar="KEY",
+                    help="Sticker key or file path to composite (repeatable)")
+    ap.add_argument("--sticker-pos", default="center", choices=STICKER_POSITIONS,
+                    metavar="POS",
+                    help="Position for all --sticker entries "
+                         f"({', '.join(STICKER_POSITIONS)})")
+    ap.add_argument("--sticker-scale", type=float, default=0.3, metavar="SCALE",
+                    help="Scale factor 0.05–1.0 (fraction of shorter canvas side)")
+    ap.add_argument("--list-stickers", action="store_true",
+                    help="List available built-in and user stickers, then exit")
     ap.add_argument("--version",       action="version", version=f"GIF Maker v{VERSION}")
     args = ap.parse_args()
 
@@ -1216,6 +1623,8 @@ def main():
         print("\nOverlays:"); [print(f"  {k:<18} {v[0]}") for k,v in OVERLAYS.items()]; return
     if args.list_presets:
         print("\nSaved presets:"); list_presets(); return
+    if args.list_stickers:
+        list_stickers(); return
 
     cfg = default_cfg()
     if args.image:         cfg["source_path"] = args.image
@@ -1228,6 +1637,10 @@ def main():
     cfg["max_side"]      = args.size
     cfg["duration"]      = args.duration
     cfg["output_path"]   = args.output
+    cfg["stickers"]      = [
+        {"key": k, "position": args.sticker_pos, "scale": args.sticker_scale}
+        for k in args.sticker_keys
+    ]
 
     # non-interactive
     if args.no_interactive:
@@ -1252,6 +1665,7 @@ def main():
         elif ch == "6": handle_output(cfg)
         elif ch == "7": handle_save_preset(cfg)
         elif ch == "8": handle_load_preset(cfg)
+        elif ch == "S": handle_stickers(cfg)
         elif ch == "L": handle_list(cfg)
         elif ch == "G": handle_generate(cfg)
         elif ch == "Q": print(f"\n  {c('Goodbye! 🦆',YEL)}"); break
