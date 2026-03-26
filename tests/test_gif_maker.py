@@ -195,3 +195,89 @@ def test_cli_generate_with_effect_and_overlay(img_path, tmp_path):
     r = _run(img_path, "-e", "glitch", "-o", "sparkles", "--frames", "3", "-n", "-O", out)
     assert r.returncode == 0
     assert os.path.exists(out)
+
+
+# ---------------------------------------------------------------------------
+# Sticker system
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize("key", list(gm.STICKERS.keys()))
+def test_builtin_sticker_returns_n_rgba_frames(key):
+    fn = gm.STICKERS[key][1]
+    n = 4
+    frames = fn(n, 40)
+    assert len(frames) == n, f"{key}: expected {n} frames"
+    for f in frames:
+        assert f.mode == "RGBA", f"{key}: frame mode is {f.mode}"
+        assert f.size == (40, 40), f"{key}: unexpected size {f.size}"
+
+
+@pytest.mark.parametrize("key", list(gm.STICKERS.keys()))
+def test_apply_sticker_does_not_change_frame_count_or_size(small_img, key):
+    frames = [small_img.copy() for _ in range(4)]
+    original_size = frames[0].size
+    gm.apply_sticker(frames, key, position="center", scale=0.4)
+    assert len(frames) == 4, f"{key}: sticker changed frame count"
+    for f in frames:
+        assert f.size == original_size, f"{key}: sticker changed frame size"
+
+
+@pytest.mark.parametrize("pos", gm.STICKER_POSITIONS)
+def test_apply_sticker_all_positions(small_img, pos):
+    frames = [small_img.copy() for _ in range(2)]
+    gm.apply_sticker(frames, "star", position=pos, scale=0.3)
+    assert len(frames) == 2
+
+
+def test_apply_sticker_unknown_key_does_not_raise(small_img):
+    frames = [small_img.copy() for _ in range(2)]
+    gm.apply_sticker(frames, "nonexistent_sticker_xyz")
+    assert len(frames) == 2
+
+
+def test_apply_sticker_from_png_file(small_img, tmp_path):
+    # Save a small transparent PNG and use it as a sticker
+    sticker_file = str(tmp_path / "my_sticker.png")
+    Image.new("RGBA", (16, 16), (255, 0, 0, 128)).save(sticker_file)
+    frames = [small_img.copy() for _ in range(3)]
+    gm.apply_sticker(frames, sticker_file, position="center", scale=0.4)
+    assert len(frames) == 3
+
+
+def test_generate_with_sticker(img_path, tmp_path):
+    cfg = gm.default_cfg()
+    cfg["source_path"] = img_path
+    cfg["output_path"] = str(tmp_path / "out_sticker.gif")
+    cfg["n_frames"] = 3
+    cfg["stickers"] = [{"key": "heart", "position": "center", "scale": 0.4}]
+    out, sz = gm.generate(cfg)
+    assert os.path.exists(out)
+    assert sz > 0
+
+
+def test_cli_list_stickers():
+    r = _run("--list-stickers")
+    assert r.returncode == 0
+    assert "star" in r.stdout
+    assert "heart" in r.stdout
+
+
+def test_cli_generate_with_sticker(img_path, tmp_path):
+    out = str(tmp_path / "result_sticker.gif")
+    r = _run(img_path, "--sticker", "star", "--sticker-pos", "top-right",
+             "--sticker-scale", "0.3", "--frames", "3", "-n", "-O", out)
+    assert r.returncode == 0
+    assert os.path.exists(out)
+
+
+def test_sticker_preset_round_trip(tmp_path, monkeypatch):
+    preset_file = str(tmp_path / "presets.json")
+    monkeypatch.setattr(gm, "PRESETS_FILE", preset_file)
+
+    cfg = gm.default_cfg()
+    cfg["stickers"] = [{"key": "crown", "position": "top-left", "scale": 0.25}]
+    gm.save_preset("sticker_preset", cfg)
+
+    loaded = gm.load_presets()
+    assert "sticker_preset" in loaded
+    assert loaded["sticker_preset"]["stickers"][0]["key"] == "crown"
+    assert "source_path" not in loaded["sticker_preset"]
