@@ -24,6 +24,8 @@ import os, sys, math, random, json, shutil, argparse
 import numpy as np
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
 
+VERSION = "1.0"
+
 # ── paths & library ───────────────────────────────────────────────────────────
 LIBRARY_DIR  = os.path.expanduser("~/.gif-maker/library")
 PRESETS_FILE = os.path.expanduser("~/.gif-maker/presets.json")
@@ -200,19 +202,19 @@ def efx_hud(img, n):
 def efx_holographic(img, n):
     base = np.array(img.convert("RGBA"), dtype=np.float32)
     H, W = base.shape[:2]
+    ys = np.arange(H, dtype=np.float32)
     frames = []
     for i in range(n):
         t = i / n
         arr = base.copy()
-        for y in range(H):
-            p = (y / H + t) % 1.0
-            r = 0.5 + 0.5 * math.sin(p * 2 * math.pi)
-            g = 0.5 + 0.5 * math.sin(p * 2 * math.pi + 2.094)
-            b = 0.5 + 0.5 * math.sin(p * 2 * math.pi + 4.189)
-            bl = 0.35
-            arr[y,:,0] = np.clip(arr[y,:,0]*(1-bl) + r*255*bl, 0, 255)
-            arr[y,:,1] = np.clip(arr[y,:,1]*(1-bl) + g*255*bl, 0, 255)
-            arr[y,:,2] = np.clip(arr[y,:,2]*(1-bl) + b*255*bl, 0, 255)
+        p = (ys / H + t) % 1.0
+        bl = 0.35
+        r_row = (0.5 + 0.5 * np.sin(p * 2 * math.pi))[:, np.newaxis] * 255 * bl
+        g_row = (0.5 + 0.5 * np.sin(p * 2 * math.pi + 2.094))[:, np.newaxis] * 255 * bl
+        b_row = (0.5 + 0.5 * np.sin(p * 2 * math.pi + 4.189))[:, np.newaxis] * 255 * bl
+        arr[:, :, 0] = np.clip(arr[:, :, 0] * (1 - bl) + r_row, 0, 255)
+        arr[:, :, 1] = np.clip(arr[:, :, 1] * (1 - bl) + g_row, 0, 255)
+        arr[:, :, 2] = np.clip(arr[:, :, 2] * (1 - bl) + b_row, 0, 255)
         frames.append(Image.fromarray(arr.astype(np.uint8), "RGBA"))
     return frames
 
@@ -245,35 +247,38 @@ def efx_pixelsort(img, n):
     frames = []
     for i in range(n):
         arr = base.copy()
-        cap = int(W * i / n)
-        for col in range(min(cap, W)):
-            idx = np.argsort(bri[:, col])
-            arr[:, col, :] = arr[idx, col, :]
+        cap = min(int(W * i / n), W)
+        if cap > 0:
+            idx = np.argsort(bri[:, :cap], axis=0)
+            arr[:, :cap, :] = arr[idx, np.arange(cap)[np.newaxis, :], :]
         frames.append(Image.fromarray(arr, "RGBA"))
     return frames
+
+def _midpoint_bolt(rng, x1, y1, x2, y2, depth=6):
+    """Generate a midpoint-displacement lightning bolt path."""
+    pts = [(x1, y1), (x2, y2)]
+    for _ in range(depth):
+        npts = []
+        for j in range(len(pts) - 1):
+            ax, ay = pts[j]; bx, by = pts[j + 1]
+            mx = (ax + bx) / 2 + rng.uniform(-1, 1) * 0.5 * abs(bx - ax)
+            my = (ay + by) / 2 + rng.uniform(-1, 1) * 0.5 * abs(by - ay)
+            npts.extend([(ax, ay), (mx, my)])
+        npts.append(pts[-1])
+        pts = npts
+    return [(int(x), int(y)) for x, y in pts]
 
 def efx_lightning(img, n):
     base = img.convert("RGBA")
     W, H = base.size
     rng = random.Random(99)
-    def bolt(x1, y1, x2, y2, depth=6):
-        pts = [(x1,y1),(x2,y2)]
-        for _ in range(depth):
-            npts = []
-            for j in range(len(pts)-1):
-                ax,ay = pts[j]; bx,by = pts[j+1]
-                mx = (ax+bx)/2 + rng.uniform(-1,1)*0.5*abs(bx-ax)
-                my = (ay+by)/2 + rng.uniform(-1,1)*0.5*abs(by-ay)
-                npts.extend([(ax,ay),(mx,my)])
-            npts.append(pts[-1]); pts = npts
-        return [(int(x), int(y)) for x,y in pts]
     frames = []
     for i in range(n):
         f = base.copy()
         if i % 5 in (0, 1):
             draw = ImageDraw.Draw(f)
-            pts = bolt(W//2 + rng.randint(-W//4, W//4), 0,
-                       W//2 + rng.randint(-W//8, W//8), H)
+            pts = _midpoint_bolt(rng, W//2 + rng.randint(-W//4, W//4), 0,
+                                 W//2 + rng.randint(-W//8, W//8), H)
             for wd, col in [(4,(200,220,255,80)),(2,(220,240,255,160)),(1,(255,255,255,255))]:
                 draw.line(pts, fill=col, width=wd)
         frames.append(f)
@@ -282,11 +287,10 @@ def efx_lightning(img, n):
 def efx_vignette(img, n):
     base = img.convert("RGBA")
     W, H = base.size
-    vig = np.zeros((H, W), dtype=np.uint8)
-    for band in range(min(H, W) // 2):
-        alpha = min(255, band * 6)
-        for x in range(band, W-band): vig[band, x] = vig[H-band-1, x] = alpha
-        for y in range(band, H-band): vig[y, band] = vig[y, W-band-1] = alpha
+    ys = np.arange(H)[:, np.newaxis]
+    xs = np.arange(W)[np.newaxis, :]
+    dist = np.minimum(np.minimum(ys, H - 1 - ys), np.minimum(xs, W - 1 - xs))
+    vig = np.clip(dist * 6, 0, 255).astype(np.uint8)
     vig_img = Image.fromarray(vig, "L")
     rng = random.Random(13)
     stars = [(rng.randint(0,W-1), rng.randint(0,H-1), rng.uniform(0,1)) for _ in range(25)]
@@ -470,21 +474,11 @@ def ovl_confetti(frames, seed=5):
 def ovl_lightning_flash(frames, seed=99):
     rng = random.Random(seed)
     W, H = frames[0].size
-    def bolt(x1, y1, x2, y2, d=5):
-        pts = [(x1,y1),(x2,y2)]
-        for _ in range(d):
-            npts = []
-            for j in range(len(pts)-1):
-                ax,ay=pts[j]; bx,by=pts[j+1]
-                mx=(ax+bx)/2+rng.uniform(-1,1)*0.5*abs(bx-ax)
-                my=(ay+by)/2+rng.uniform(-1,1)*0.5*abs(by-ay)
-                npts.extend([(ax,ay),(mx,my)])
-            npts.append(pts[-1]); pts=npts
-        return [(int(x),int(y)) for x,y in pts]
     for i, f in enumerate(frames):
         if i % 6 in (0, 1):
             draw = ImageDraw.Draw(f)
-            pts = bolt(rng.randint(W//4, 3*W//4), 0, rng.randint(W//4, 3*W//4), H)
+            pts = _midpoint_bolt(rng, rng.randint(W//4, 3*W//4), 0,
+                                 rng.randint(W//4, 3*W//4), H, depth=5)
             for wd, col in [(4,(200,220,255,60)),(2,(220,240,255,140)),(1,(255,255,255,255))]:
                 draw.line(pts, fill=col, width=wd)
 
@@ -610,7 +604,7 @@ def ovl_emoji_party(frames, seed=91):
     W, H = frames[0].size
     fnt = get_font(22)
     symbols = ["✨","⭐","💥","💫","🌟","⚡","★","✦","✵","❋"]
-    positions = [(rng.randint(5,W-30), rng.randint(5,H-30), rng.uniform(0,1))
+    positions = [(rng.randint(5, max(5, W-30)), rng.randint(5, max(5, H-30)), rng.uniform(0,1))
                  for _ in range(8)]
     for i, f in enumerate(frames):
         t = i/n; draw = ImageDraw.Draw(f)
@@ -807,7 +801,7 @@ def list_presets():
 def banner():
     print(c(BLD, BLD))
     print(c("╔══════════════════════════════════════════════════════════╗", CYN))
-    print(c("║       🎨  GIF MAKER  v1.0  —  Acrolite  Tools            ║", CYN))
+    print(c(f"║       🎨  GIF MAKER  v{VERSION}  —  Acrolite  Tools            ║", CYN))
     print(c("║    Turn still images into animated GIFs, from the CLI.   ║", CYN))
     print(c("╚══════════════════════════════════════════════════════════╝", CYN))
     print(RST)
@@ -883,11 +877,30 @@ def pause():
 
 # ── handlers ──────────────────────────────────────────────────────────────────
 
+_PRESET_ALLOWED_KEYS = {
+    "effect", "overlays", "text", "text_style", "text_color",
+    "text_size", "text_position", "max_side", "n_frames", "duration",
+    "output_path",
+}
+
+def _prompt_int(msg: str, default: int, min_val: int = 1, max_val: int = 10_000) -> int:
+    """Prompt for an integer, retrying on invalid input or out-of-range values."""
+    while True:
+        raw = prompt(msg, default=str(default))
+        try:
+            val = int(raw)
+            if min_val <= val <= max_val:
+                return val
+            print(f"  {c(f'Must be between {min_val} and {max_val}.', RED)}")
+        except ValueError:
+            print(f"  {c('Please enter a whole number.', RED)}")
+
 def handle_source(cfg: dict):
     p = prompt("Image path").strip("'\"")
-    if os.path.exists(p):
-        cfg["source_path"] = p
-        base = os.path.splitext(p)[0]
+    resolved = os.path.realpath(p)
+    if os.path.isfile(resolved):
+        cfg["source_path"] = resolved
+        base = os.path.splitext(resolved)[0]
         cfg.setdefault("output_path", base + "-animated.gif")
         print(f"  {c('✓',GRN)} Loaded.")
     else:
@@ -935,18 +948,18 @@ def handle_text(cfg: dict):
     print(f"\n  Styles:")
     for i, s in enumerate(TEXT_STYLES):
         print(f"    {c(i,YEL)}  {s}")
-    cfg["text_style"] = TEXT_STYLES[
-        min(len(TEXT_STYLES)-1, max(0, int(prompt("Style number", default="1") or 1)))]
-    cfg["text_size"] = int(prompt("Font size px", default="22") or 22)
+    style_idx = _prompt_int("Style number", 1, 0, len(TEXT_STYLES) - 1)
+    cfg["text_style"] = TEXT_STYLES[style_idx]
+    cfg["text_size"] = _prompt_int("Font size px", 22, 8, 120)
     pos = prompt("Position (bottom/top/center)", default="bottom")
     cfg["text_position"] = pos if pos in ("bottom","top","center") else "bottom"
     print(f"  {c('✓',GRN)} Text configured.")
     pause()
 
 def handle_settings(cfg: dict):
-    cfg["max_side"] = int(prompt("Max side px",    default=str(cfg.get("max_side",480))) or 480)
-    cfg["n_frames"] = int(prompt("Frame count",    default=str(cfg.get("n_frames",20)))  or 20)
-    cfg["duration"] = int(prompt("ms per frame",   default=str(cfg.get("duration",80)))  or 80)
+    cfg["max_side"] = _prompt_int("Max side px", cfg.get("max_side", 480), 32, 4096)
+    cfg["n_frames"] = _prompt_int("Frame count", cfg.get("n_frames", 20), 1, 120)
+    cfg["duration"] = _prompt_int("ms per frame", cfg.get("duration", 80), 10, 5000)
     print(f"  {c('✓',GRN)} Settings updated.")
     pause()
 
@@ -980,7 +993,9 @@ def handle_load_preset(cfg: dict):
     ch = prompt("Load preset (name or number)")
     try:
         p = presets[names[int(ch)]] if ch.isdigit() else presets[ch]
-        for k, v in p.items(): cfg[k] = v
+        for k, v in p.items():
+            if k in _PRESET_ALLOWED_KEYS:
+                cfg[k] = v
         print(f"  {c('✓',GRN)} Preset loaded.")
     except Exception:
         print(f"  {c('Not found.',RED)}")
@@ -1007,7 +1022,7 @@ def default_cfg() -> dict:
 
 def main():
     ap = argparse.ArgumentParser(
-        description="GIF Maker v1.0 — Acrolite Tools",
+        description=f"GIF Maker v{VERSION} — Acrolite Tools",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__)
     ap.add_argument("image",      nargs="?", help="Source image path")
@@ -1026,6 +1041,7 @@ def main():
     ap.add_argument("--list-effects",  action="store_true")
     ap.add_argument("--list-overlays", action="store_true")
     ap.add_argument("--list-presets",  action="store_true")
+    ap.add_argument("--version",       action="version", version=f"GIF Maker v{VERSION}")
     args = ap.parse_args()
 
     if args.list_effects:
