@@ -1312,7 +1312,7 @@ def show_status(cfg: dict):
     txt_label  = c(f"'{cfg['text']}' [{cfg.get('text_style','neon_glow')}]", CYN) if cfg.get("text") else c("–", DIM)
     stk_parts  = [f"{s['key']}@{s.get('position','center')}" for s in cfg.get("stickers",[])]
     stk_label  = c(", ".join(stk_parts) or "–", CYN)
-    out_label  = c(os.path.basename(cfg.get("output_path","(auto)")), GRN)
+    out_label  = c(os.path.basename(cfg.get("output_path") or "(auto)"), GRN)
     print(hr())
     print(f"  {c('Source',BLD)}   {src_label}  {c(f'({W_}×{H_})', DIM)}")
     print(f"  {c('Effect',BLD)}   {efx_label}")

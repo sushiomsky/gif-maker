@@ -1,0 +1,185 @@
+{
+  "canvas_size": [
+    800,
+    500
+  ],
+  "clock": {
+    "sim_time": 4.000000000000003,
+    "time_scale": 1.0
+  },
+  "relationships": {
+    "duck_0|duck_2": {
+      "score": 0.0,
+      "interaction_count": 0,
+      "last_interaction_time": 0.0,
+      "last_interaction_type": "none"
+    },
+    "duck_1|duck_2": {
+      "score": 0.0,
+      "interaction_count": 0,
+      "last_interaction_time": 0.0,
+      "last_interaction_type": "none"
+    }
+  },
+  "ducks": {
+    "duck_0": {
+      "id": "duck_0",
+      "name": "duck_0",
+      "fps": 12,
+      "position": [
+        0.6386232029201553,
+        0.7086363335036191
+      ],
+      "velocity": [
+        0.0,
+        0.0
+      ],
+      "personality": {
+        "shyness": 0.3494735675249479,
+        "sociability": 0.44422314097463855,
+        "energy": 0.5466815061020133,
+        "caution": 0.6344055032020652,
+        "_baseline": {
+          "shyness": 0.3494735675249479,
+          "sociability": 0.44422314097463855,
+          "energy": 0.5466815061020133,
+          "caution": 0.6344055032020652
+        }
+      },
+      "emotion_blender": {
+        "current": {
+          "eye_open": 1.0,
+          "brow_angle": 0.0,
+          "brow_raise": 0.0,
+          "blink_rate": 0.03,
+          "look_bias_x": 0.0,
+          "look_bias_y": 0.0
+        },
+        "target": {
+          "eye_open": 1.0,
+          "brow_angle": 0.0,
+          "brow_raise": 0.0,
+          "blink_rate": 0.03,
+          "look_bias_x": 0.0,
+          "look_bias_y": 0.0
+        },
+        "target_name": "neutral"
+      },
+      "memory": {
+        "duck_id": "duck_0",
+        "last_decay_sim_time": 0.0,
+        "entries": []
+      },
+      "gaze_target_id": "duck_1",
+      "is_speaking": false,
+      "is_listening": false
+    },
+    "duck_1": {
+      "id": "duck_1",
+      "name": "duck_1",
+      "fps": 12,
+      "position": [
+        0.3922406727346213,
+        0.7432008473967675
+      ],
+      "velocity": [
+        0.0,
+        0.0
+      ],
+      "personality": {
+        "shyness": 0.26410937168643633,
+        "sociability": 0.8347089182252907,
+        "energy": 0.7775829509507337,
+        "caution": 0.671214204514854,
+        "_baseline": {
+          "shyness": 0.26410937168643633,
+          "sociability": 0.8347089182252907,
+          "energy": 0.7775829509507337,
+          "caution": 0.671214204514854
+        }
+      },
+      "emotion_blender": {
+        "current": {
+          "eye_open": 1.0,
+          "brow_angle": 0.0,
+          "brow_raise": 0.0,
+          "blink_rate": 0.03,
+          "look_bias_x": 0.0,
+          "look_bias_y": 0.0
+        },
+        "target": {
+          "eye_open": 1.0,
+          "brow_angle": 0.0,
+          "brow_raise": 0.0,
+          "blink_rate": 0.03,
+          "look_bias_x": 0.0,
+          "look_bias_y": 0.0
+        },
+        "target_name": "neutral"
+      },
+      "memory": {
+        "duck_id": "duck_1",
+        "last_decay_sim_time": 0.0,
+        "entries": []
+      },
+      "gaze_target_id": "duck_0",
+      "is_speaking": false,
+      "is_listening": false
+    },
+    "duck_2": {
+      "id": "duck_2",
+      "name": "duck_2",
+      "fps": 12,
+      "position": [
+        0.44782152900302935,
+        0.5539429924699845
+      ],
+      "velocity": [
+        0.0,
+        0.0
+      ],
+      "personality": {
+        "shyness": 0.4726726329113268,
+        "sociability": 0.3123353807276005,
+        "energy": 0.8840310517087284,
+        "caution": 0.2074060343825218,
+        "_baseline": {
+          "shyness": 0.4726726329113268,
+          "sociability": 0.3123353807276005,
+          "energy": 0.8840310517087284,
+          "caution": 0.2074060343825218
+        }
+      },
+      "emotion_blender": {
+        "current": {
+          "eye_open": 0.9996105598101095,
+          "brow_angle": 0.008654226442010849,
+          "brow_raise": 0.008654226442010849,
+          "blink_rate": 0.029989182216947484,
+          "look_bias_x": 0.0,
+          "look_bias_y": -0.0021635566105027123
+        },
+        "target": {
+          "eye_open": 1.0,
+          "brow_angle": 0.0,
+          "brow_raise": 0.0,
+          "blink_rate": 0.03,
+          "look_bias_x": 0.0,
+          "look_bias_y": 0.0
+        },
+        "target_name": "neutral"
+      },
+      "memory": {
+        "duck_id": "duck_2",
+        "last_decay_sim_time": 0.0,
+        "entries": []
+      },
+      "gaze_target_id": null,
+      "is_speaking": false,
+      "is_listening": false
+    }
+  },
+  "frame_count": 48,
+  "version": "1.0",
+  "saved_at": "2026-03-26T20:22:43.442226+00:00"
+}
